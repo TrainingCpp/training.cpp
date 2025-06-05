@@ -1,0 +1,149 @@
+#include <iostream>
+#include <map>
+#include <unordered_map>
+#include <set>
+#include <deque>
+#include <string>
+
+using namespace std;
+
+// Struct to represent file metadata
+struct File {
+    string name;
+    string owner;
+};
+
+map<int, File> fileSystem;                            // fileID -> File struct
+unordered_map<int, int> accessFrequency;              // fileID -> access count
+unordered_map<int, int> lastAccessedTime;             // fileID -> last accessed timestamp
+unordered_map<string, set<int>> userAccessMap;        // userName -> accessed fileIDs
+unordered_map<int, deque<pair<string, string>>> accessLog; // fileID -> {user, accessType}
+set<pair<int, int>> recentAccessSet;                  // {lastAccessedTime, fileID}
+
+// Global timestamp
+int timestamp = 0;
+
+// Function to add a virtual file
+void addFile(int fileID, const string& fileName, const string& owner) {
+    if (fileSystem.count(fileID)) {
+        cout << "Error: File ID " << fileID << " already exists.\n";
+        return;
+    }
+    fileSystem[fileID] = {fileName, owner};
+    accessFrequency[fileID] = 0;
+    cout << "File " << fileName << " added successfully.\n";
+}
+
+// Function to access a file
+void accessFile(int fileID, const string& accessType, const string& user) {
+    if (!fileSystem.count(fileID)) {
+        cout << "Error: File ID " << fileID << " not found.\n";
+        return;
+    }
+    ++accessFrequency[fileID];
+    lastAccessedTime[fileID] = ++timestamp;
+    userAccessMap[user].insert(fileID);
+    accessLog[fileID].emplace_back(user, accessType);
+
+    recentAccessSet.erase({lastAccessedTime[fileID] - 1, fileID});
+    recentAccessSet.insert({lastAccessedTime[fileID], fileID});
+    cout << "File " << fileSystem[fileID].name << " accessed by " << user 
+         << " for " << accessType << ".\n";
+}
+
+// Function to delete a file
+void deleteFile(int fileID) {
+    if (!fileSystem.count(fileID)) {
+        cout << "Error: File ID " << fileID << " not found.\n";
+        return;
+    }
+    fileSystem.erase(fileID);
+    accessFrequency.erase(fileID);
+    lastAccessedTime.erase(fileID);
+    recentAccessSet.erase({lastAccessedTime[fileID], fileID});
+    accessLog.erase(fileID);
+
+    for (auto& [user, files] : userAccessMap) {
+        files.erase(fileID);
+    }
+    cout << "File ID " << fileID << " deleted successfully.\n";
+}
+
+// Function to list all files
+void listAllFiles() {
+    cout << "[All Files]\n";
+    for (const auto& [fileID, file] : fileSystem) {
+        cout << "ID: " << fileID << " | Name: " << file.name
+             << " | Owner: " << file.owner << "\n";
+    }
+}
+
+// Function to list recently accessed files
+void listRecentFiles() {
+    cout << "[Recently Accessed Files]\n";
+    for (auto it = recentAccessSet.rbegin(); it != recentAccessSet.rend(); ++it) {
+        int fileID = it->second;
+        cout << "ID: " << fileID << " | Name: " << fileSystem[fileID].name
+             << " | Last Accessed: " << it->first << "\n";
+    }
+}
+
+// Function to list files by user access
+void listFilesByUser(const string& user) {
+    if (!userAccessMap.count(user)) {
+        cout << "No files accessed by " << user << ".\n";
+        return;
+    }
+    cout << "[Files Accessed by User: " << user << "]\n";
+    for (int fileID : userAccessMap[user]) {
+        cout << "ID: " << fileID << " | Name: " << fileSystem[fileID].name << "\n";
+    }
+}
+
+int main() {
+    string command;
+    while (true) {
+        cout << "Enter command (ADD/ACCESS/DELETE/LIST_ALL/LIST_RECENT/LIST_BY_USER/EXIT): ";
+        cin >> command;
+
+        if (command == "ADD") {
+            int fileID;
+            string fileName, owner;
+            cout << "Enter File ID, Name, and Owner: ";
+            cin >> fileID >> fileName >> owner;
+            addFile(fileID, fileName, owner);
+        } 
+        else if (command == "ACCESS") {
+            int fileID;
+            string accessType, user;
+            cout << "Enter File ID, Access Type (READ/WRITE), and User: ";
+            cin >> fileID >> accessType >> user;
+            accessFile(fileID, accessType, user);
+        } 
+        else if (command == "DELETE") {
+            int fileID;
+            cout << "Enter File ID to delete: ";
+            cin >> fileID;
+            deleteFile(fileID);
+        } 
+        else if (command == "LIST_ALL") {
+            listAllFiles();
+        } 
+        else if (command == "LIST_RECENT") {
+            listRecentFiles();
+        } 
+        else if (command == "LIST_BY_USER") {
+            string user;
+            cout << "Enter User Name: ";
+            cin >> user;
+            listFilesByUser(user);
+        } 
+        else if (command == "EXIT") {
+            break;
+        } 
+        else {
+            cout << "Invalid command. Try again.\n";
+        }
+    }
+    return 0;
+}
