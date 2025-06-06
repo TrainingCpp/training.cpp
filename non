@@ -1,6 +1,5 @@
 #include <iostream>
 #include <fstream>
-#include <vector>
 #include <string>
 
 using namespace std;
@@ -11,43 +10,71 @@ protected:
     int memory[16] = {0};
     bool halted = false;
 
-    // Parse line directly into instr, op1, op2 without token strings
     void parse(const string& line, string& instr, string& op1, string& op2) {
-        instr.clear();
-        op1.clear();
-        op2.clear();
+        instr = "";
+        op1 = "";
+        op2 = "";
 
-        vector<char> chars(line.begin(), line.end());
-        int part = 0; // 0=instr, 1=op1, 2=op2
-        string* current = &instr;
+        // Remove comment
+        string code = line;
+        size_t commentPos = code.find(';');
+        if (commentPos != string::npos) {
+            code = code.substr(0, commentPos);
+        }
 
-        for (size_t i = 0; i < chars.size(); ++i) {
-            char c = chars[i];
-            if (c == ';') break; // comment
+        // Replace commas with space
+        size_t commaPos = code.find(',');
+        while (commaPos != string::npos) {
+            code[commaPos] = ' ';
+            commaPos = code.find(',', commaPos + 1);
+        }
 
-            if (c == ' ' || c == ',' || c == '\t') {
-                if (!current->empty()) {
-                    if (part == 0) {
-                        current = &op1;
-                        part = 1;
-                    } else if (part == 1) {
-                        current = &op2;
-                        part = 2;
-                    }
+        // Remove extra spaces manually (just normalize to 1 space between tokens)
+        string cleaned = "";
+        bool spaceFlag = false;
+        for (size_t i = 0; i < code.size(); ++i) {
+            char c = code[i];
+            if (c == ' ' || c == '\t') {
+                if (!spaceFlag && !cleaned.empty()) {
+                    cleaned += ' ';
+                    spaceFlag = true;
                 }
             } else {
-                current->push_back(c);
+                cleaned += c;
+                spaceFlag = false;
             }
         }
+
+        // Remove leading/trailing space
+        if (!cleaned.empty() && cleaned.front() == ' ') cleaned.erase(0, 1);
+        if (!cleaned.empty() && cleaned.back() == ' ') cleaned.pop_back();
+
+        // Parse into instr, op1, op2
+        size_t p1 = cleaned.find(' ');
+        if (p1 == string::npos) {
+            instr = cleaned;
+            return;
+        }
+
+        instr = cleaned.substr(0, p1);
+        size_t p2 = cleaned.find(' ', p1 + 1);
+        if (p2 == string::npos) {
+            op1 = cleaned.substr(p1 + 1);
+            return;
+        }
+
+        op1 = cleaned.substr(p1 + 1, p2 - p1 - 1);
+        op2 = cleaned.substr(p2 + 1);
     }
 
     int* getOperand(const string& op, int& imm) {
-        if (op.size() >= 3 && op.front() == '[' && op.back() == ']') {
+        if (op.size() >= 3 && op[0] == '[' && op[op.size() - 1] == ']') {
             int idx = stoi(op.substr(1, op.size() - 2));
             if (idx >= 0 && idx < 16) return &memory[idx];
             cout << "Invalid memory index\n";
             return nullptr;
         }
+
         if (op == "AX") return &AX;
         if (op == "BX") return &BX;
         if (op == "CX") return &CX;
