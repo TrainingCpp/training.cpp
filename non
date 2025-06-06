@@ -20,11 +20,9 @@ protected:
 
         string code = line;
 
-        // Replace commas with spaces
         while (code.find(',') != string::npos)
             code[code.find(',')] = ' ';
 
-        // Normalize spacing
         string cleaned = "";
         bool spaceFlag = false;
         for (char c : code) {
@@ -42,7 +40,6 @@ protected:
         if (!cleaned.empty() && cleaned.front() == ' ') cleaned.erase(0, 1);
         if (!cleaned.empty() && cleaned.back() == ' ') cleaned.pop_back();
 
-        // Tokenize
         size_t p1 = cleaned.find(' ');
         if (p1 == string::npos) {
             instr = cleaned;
@@ -78,46 +75,56 @@ protected:
     }
 
     void handleMOV(int* dest, int* src, int imm) {
-        if (dest) {
-            if (src) *dest = *src;
-            else *dest = imm;
+        if (dest != nullptr) {
+            if (src != nullptr)
+                *dest = *src;
+            else
+                *dest = imm;
         } else {
             cout << "Invalid MOV destination\n";
         }
     }
 
     void handleADD(int* dest, int* src, int imm) {
-        if (dest) {
-            if (src) *dest += *src;
-            else *dest += imm;
+        if (dest != nullptr) {
+            if (src != nullptr)
+                *dest += *src;
+            else
+                *dest += imm;
         } else {
             cout << "Invalid ADD destination\n";
         }
     }
 
     void handleSUB(int* dest, int* src, int imm) {
-        if (dest) {
-            if (src) *dest -= *src;
-            else *dest -= imm;
+        if (dest != nullptr) {
+            if (src != nullptr)
+                *dest -= *src;
+            else
+                *dest -= imm;
         } else {
             cout << "Invalid SUB destination\n";
         }
     }
 
     void handleMUL(int* dest, int* src, int imm) {
-        if (dest) {
-            if (src) *dest *= *src;
-            else *dest *= imm;
+        if (dest != nullptr) {
+            if (src != nullptr)
+                *dest *= *src;
+            else
+                *dest *= imm;
         } else {
             cout << "Invalid MUL destination\n";
         }
     }
 
     void handleDIV(int* dest, int* src, int imm) {
-        if (dest) {
-            int divisor = src ? *src : imm;
-            if (divisor == 0) cout << "Division by zero!\n";
-            else *dest /= divisor;
+        if (dest != nullptr) {
+            int divisor = (src != nullptr) ? *src : imm;
+            if (divisor == 0)
+                cout << "Division by zero!\n";
+            else
+                *dest /= divisor;
         } else {
             cout << "Invalid DIV destination\n";
         }
