@@ -1,3 +1,214 @@
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+
+class Memory {
+public:
+    Memory() {
+        // Initialize memory with 64KB (65536 bytes)
+        memory.resize(65536, 0);
+    }
+
+    int read(int address) {
+        return memory[address];
+    }
+
+    void write(int address, int value) {
+        memory[address] = value;
+    }
+
+    void printSnapshot() {
+        for (int i = 0; i < 16; ++i) {
+            std::cout << i << " -> " << memory[i] << std::endl;
+        }
+    }
+
+private:
+    std::vector<int> memory;
+};
+
+class Registers {
+public:
+    Registers() {
+        // Initialize registers to 0
+        registers["AX"] = 0;
+        registers["BX"] = 0;
+        registers["CX"] = 0;
+        registers["DX"] = 0;
+    }
+
+    int get(const std::string& reg) {
+        return registers[reg];
+    }
+
+    void set(const std::string& reg, int value) {
+        registers[reg] = value;
+    }
+
+    void printSnapshot() {
+        std::cout << "AX: " << registers["AX"] << std::endl;
+        std::cout << "BX: " << registers["BX"] << std::endl;
+        std::cout << "CX: " << registers["CX"] << std::endl;
+        std::cout << "DX: " << registers["DX"] << std::endl;
+    }
+
+private:
+    std::unordered_map<std::string, int> registers;
+};
+
+class Processor {
+public:
+    Processor() : pc(0), running(true) {}
+
+    void loadInstructions(const std::vector<std::string>& instructions) {
+        this->instructions = instructions;
+    }
+
+    void execute(Memory& memory, Registers& registers) {
+        while (running && pc < instructions.size()) {
+            std::string instruction = instructions[pc];
+            parseAndExecute(instruction, memory, registers);
+            pc++;
+        }
+    }
+
+    void printSnapshot(Memory& memory, Registers& registers) {
+        std::cout << "Received Interrupt" << std::endl;
+        registers.printSnapshot();
+        memory.printSnapshot();
+    }
+
+private:
+    int pc; // Program Counter
+    bool running;
+    std::vector<std::string> instructions;
+
+    void parseAndExecute(const std::string& instruction, Memory& memory, Registers& registers) {
+        size_t spacePos = instruction.find(' ');
+        std::string op = (spacePos == std::string::npos) ? instruction : instruction.substr(0, spacePos);
+
+        if (op == "MOV") {
+            handleMOV(instruction.substr(spacePos + 1), memory, registers);
+        } else if (op == "ADD") {
+            handleADD(instruction.substr(spacePos + 1), registers);
+        } else if (op == "SUB") {
+            handleSUB(instruction.substr(spacePos + 1), registers);
+        } else if (op == "MUL") {
+            handleMUL(instruction.substr(spacePos + 1), registers);
+        } else if (op == "DIV") {
+            handleDIV(instruction.substr(spacePos + 1), registers);
+        } else if (op == "HLT") {
+            running = false;
+        }
+    }
+
+    void handleMOV(const std::string& args, Memory& memory, Registers& registers) {
+        size_t spacePos = args.find(' ');
+        std::string dest = args.substr(0, spacePos);
+        std::string src = args.substr(spacePos + 1);
+
+        if (src[0] == '[') { // Memory address
+            int address = std::stoi(src.substr(1, src.size() - 2));
+            if (dest[0] == '[') { // Memory to Memory
+                int srcValue = memory.read(address);
+                int destAddress = std::stoi(dest.substr(1, dest.size() - 2));
+                memory.write(destAddress, srcValue);
+            } else { // Register to Memory
+                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), registers.get(src));
+            }
+        } else if (isNumeric(src)) { // Immediate value
+            if (dest[0] == '[') { // Memory
+                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), std::stoi(src));
+            } else { // Register
+                registers.set(dest, std::stoi(src));
+            }
+        } else { // Register to Register
+            registers.set(dest, registers.get(src));
+        }
+    }
+
+    void handleADD(const std::string& args, Registers& registers) {
+        size_t spacePos = args.find(' ');
+        std::string dest = args.substr(0, spacePos);
+        std::string src = args.substr(spacePos + 1);
+        int value = (isNumeric(src)) ? std::stoi(src) : registers.get(src);
+        registers.set("AX", registers.get(dest) + value);
+    }
+
+    void handleSUB(const std::string& args, Registers& registers) {
+        size_t spacePos = args.find(' ');
+        std::string dest = args.substr(0, spacePos);
+        std::string src = args.substr(spacePos + 1);
+        int value = (isNumeric(src)) ? std::stoi(src) : registers.get(src);
+        registers.set("AX", registers.get(dest) - value);
+    }
+
+    void handleMUL(const std::string& args, Registers& registers) {
+        size_t spacePos = args.find(' ');
+        std::string dest = args.substr(0, spacePos);
+        int value = std::stoi(args.substr(spacePos + 1));
+        registers.set("AX", registers.get(dest) * value);
+    }
+
+    void handleDIV(const std::string& args, Registers& registers) {
+        std::string dest = args;
+        int divisor = registers.get(dest);
+        if (divisor != 0) {
+            registers.set("AX", registers.get("AX") / divisor);
+        } else {
+            std::cerr << "Division by zero error!" << std::endl;
+        }
+    }
+
+    bool isNumeric(const std::string& str) {
+        if (str.empty()) return false;
+        if (str[0] == '-') {
+            if (str.size() == 1) return false; // Only a negative sign
+            for (size_t i = 1; i < str.size(); ++i) {
+                if (!std::isdigit(str[i])) return false;
+            }
+        } else {
+            for (char c : str) {
+                if (!std::isdigit(c)) return false;
+            }
+        }
+        return true;
+    }
+};
+
+int main() {
+    Memory memory;
+    Registers registers;
+    Processor processor;
+
+    // Read instructions from file
+    std::ifstream infile("instructions.txt");
+    std::vector<std::string> instructions;
+    std::string line;
+
+    while (std::getline(infile, line)) {
+        if (line == "HLT") {
+            instructions.push_back(line);
+            break;
+        }
+        instructions.push_back(line);
+    }
+
+    processor.loadInstructions(instructions);
+    processor.execute(memory, registers);
+    processor.printSnapshot(memory, registers);
+
+    return 0;
+}
+
+
+
+
+
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
