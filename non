@@ -1,0 +1,220 @@
+#include <iostream>              // Include input and output stream functionality
+#include <fstream>               // Include file handling (for reading input.txt)
+#include <string>                // Include string operations
+#include <vector>                // Include vector container for dynamic arrays
+#include <unordered_map>         // Include unordered_map for mapping register names to pointers
+
+using namespace std;             // Use the standard namespace to simplify code
+
+// Define a CPU class to simulate a very simple CPU
+class CPU {
+public:                         // Public access specifier so main() can access CPU members
+
+    int AX = 0;                 // Define register AX and initialize to 0
+    int BX = 0;                 // Define register BX and initialize to 0
+    int CX = 0;                 // Define register CX and initialize to 0
+    int DX = 0;                 // Define register DX and initialize to 0
+
+    int memory[16] = {0};       // Create a small memory array of size 16, all initialized to 0
+
+    bool halted = false;        // Flag to indicate whether the CPU should stop execution
+
+    unordered_map<string, int*> regMap;  // A map from register name strings to their corresponding memory address (pointers)
+
+    CPU() {                     // Constructor: called when a CPU object is created
+        regMap.insert({"AX", &AX});  // Map the string "AX" to the address of AX
+        regMap.insert({"BX", &BX});  // Map the string "BX" to the address of BX
+        regMap.insert({"CX", &CX});  // Map the string "CX" to the address of CX
+        regMap.insert({"DX", &DX});  // Map the string "DX" to the address of DX
+    }                            // End of constructor
+
+    // Function to remove whitespace from the beginning and end of a string
+    string trim(const string& str) {
+        size_t start = 0;                          // Index of first non-space character
+        while (start < str.size() && (str[start] == ' ' || str[start] == '\t')) {
+            start++;                               // Skip leading spaces or tabs
+        }
+
+        size_t end = str.size();                   // Start from end of string
+        while (end > start && (str[end - 1] == ' ' || str[end - 1] == '\t')) {
+            end--;                                 // Skip trailing spaces or tabs
+        }
+
+        return str.substr(start, end - start);     // Return the trimmed substring
+    }
+
+    // Function to split a string into tokens (space and comma separated)
+    vector<string> split(const string& line) {
+        vector<string> tokens;        // Vector to store resulting tokens
+        string token = "";            // Temporary token string
+
+        for (size_t i = 0; i < line.size(); ++i) { // Loop through each character
+            char ch = line[i];                     // Get current character
+
+            if (ch == ' ' || ch == ',' || ch == '\t') { // If separator
+                if (token != "") {                  // If token is not empty
+                    tokens.push_back(token);        // Add token to list
+                    token = "";                     // Reset token
+                }
+            } else {
+                token += ch;                        // Add character to current token
+            }
+        }
+
+        if (token != "") {                          // Add final token if any
+            tokens.push_back(token);
+        }
+
+        return tokens;                              // Return list of tokens
+    }
+
+    // Function to interpret an operand (register, memory reference, or immediate)
+    int* getOperand(const string& op, int& immediate) {
+        string t = trim(op);                        // Remove spaces
+
+        if (t.size() >= 3 && t[0] == '[' && t[t.size() - 1] == ']') {
+            string inside = t.substr(1, t.size() - 2); // Extract the number inside brackets
+            int index = atoi(inside.c_str());          // Convert string to integer
+            if (index >= 0 && index < 16) {            // Check valid memory range
+                return &memory[index];                 // Return pointer to memory location
+            } else {
+                cout << "Invalid memory index: " << index << endl; // Error message
+                return nullptr;                         // Return null on error
+            }
+        }
+
+        auto it = regMap.find(t);                      // Search for register in map
+        if (it != regMap.end()) {
+            return it->second;                         // Return pointer to register
+        }
+
+        immediate = atoi(t.c_str());                   // Convert to immediate value
+        return nullptr;                                // Return nullptr for immediate
+    }
+
+    // Function to execute a single instruction line
+    void execute(const string& line) {
+        if (halted) return;                            // Skip execution if CPU halted
+
+        string trimmed = trim(line);                   // Trim the line
+        if (trimmed.empty()) return;                   // Skip empty lines
+        if (trimmed[0] == ';') return;                 // Skip comment lines
+
+        vector<string> parts = split(trimmed);         // Tokenize the line
+        if (parts.size() == 0) return;                 // No instruction found
+
+        string instr = parts[0];                       // Get the instruction (e.g., MOV, ADD)
+        string op1 = "", op2 = "";                     // Declare operands
+        if (parts.size() > 1) op1 = parts[1];          // Get first operand
+        if (parts.size() > 2) op2 = parts[2];          // Get second operand
+
+        int imm = 0;                                   // Store immediate if used
+        int* dest = getOperand(op1, imm);              // Resolve first operand
+        int* src = getOperand(op2, imm);               // Resolve second operand or immediate
+
+        if (instr == "MOV") {                          // Handle MOV instruction
+            if (dest != nullptr) {
+                if (src != nullptr) {
+                    *dest = *src;                      // Copy value from register or memory
+                } else {
+                    *dest = imm;                       // Copy immediate value
+                }
+            } else {
+                cout << "Invalid destination in MOV\n"; // Error if destination is invalid
+            }
+        }
+        else if (instr == "ADD") {                     // Handle ADD instruction
+            if (dest != nullptr) {
+                if (src != nullptr) {
+                    *dest = *dest + *src;              // Add value from src
+                } else {
+                    *dest = *dest + imm;               // Add immediate
+                }
+            } else {
+                cout << "Invalid destination in ADD\n";
+            }
+        }
+        else if (instr == "SUB") {                     // Handle SUB instruction
+            if (dest != nullptr) {
+                if (src != nullptr) {
+                    *dest = *dest - *src;              // Subtract value
+                } else {
+                    *dest = *dest - imm;
+                }
+            } else {
+                cout << "Invalid destination in SUB\n";
+            }
+        }
+        else if (instr == "MUL") {                     // Handle MUL instruction
+            if (dest != nullptr) {
+                if (src != nullptr) {
+                    *dest = *dest * *src;              // Multiply with src
+                } else {
+                    *dest = *dest * imm;               // Multiply with immediate
+                }
+            } else {
+                cout << "Invalid destination in MUL\n";
+            }
+        }
+        else if (instr == "DIV") {                     // Handle DIV instruction
+            if (dest != nullptr) {
+                int divisor = 0;
+                if (src != nullptr) {
+                    divisor = *src;                    // Use value from register/memory
+                } else {
+                    divisor = imm;                     // Use immediate value
+                }
+
+                if (divisor == 0) {
+                    cout << "Division by zero!\n";     // Check for divide by zero
+                } else {
+                    *dest = *dest / divisor;           // Perform division
+                }
+            } else {
+                cout << "Invalid destination in DIV\n";
+            }
+        }
+        else if (instr == "HLT") {                     // Handle HLT instruction
+            halted = true;                             // Stop further execution
+        }
+        else {                                         // Handle unknown instruction
+            cout << "Unknown instruction: " << instr << endl;
+        }
+    }
+
+    // Function to print the final state of the CPU
+    void dump() {
+        cout << "\n=== CPU STATE ===\n";               // Print header
+
+        cout << "AX: " << AX << "\n";                  // Print value of AX
+        cout << "BX: " << BX << "\n";                  // Print value of BX
+        cout << "CX: " << CX << "\n";                  // Print value of CX
+        cout << "DX: " << DX << "\n";                  // Print value of DX
+
+        cout << "\nMemory:\n";                         // Print memory values
+        for (int i = 0; i < 16; ++i) {
+            cout << "[" << i << "] = " << memory[i] << "\n"; // Print memory cell
+        }
+    }
+};
+
+// Main function: program starts here
+int main() {
+    CPU cpu;                                           // Create a CPU object
+
+    ifstream file("input.txt");                        // Open input.txt file
+    if (!file.is_open()) {                             // Check if file failed to open
+        cout << "Could not open input.txt\n";          // Print error message
+        return 1;                                      // Exit with error code
+    }
+
+    string line;                                       // Variable to hold each line
+
+    while (getline(file, line)) {                      // Read each line from file
+        cpu.execute(line);                             // Execute the line as instruction
+        if (cpu.halted) break;                         // Stop if HLT was executed
+    }
+
+    cpu.dump();                                        // Print final CPU state
+    return 0;                                          // Return success
+}
