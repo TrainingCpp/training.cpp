@@ -1,166 +1,189 @@
 #include <iostream>
 #include <fstream>
-#include <string>
+#include <sstream>
 #include <vector>
+#include <string>
+#include <unordered_map>
 
-using namespace std;
-
-class CPU {
+class Memory {
 public:
-    int AX, BX, CX, DX;
-    vector<int> memory;
-    bool halted;
-
-    CPU() : memory(64, 0) {
-        AX = 0; BX = 0; CX = 0; DX = 0;
-        halted = false;
+    Memory() {
+        // Initialize memory with 64KB (65536 bytes)
+        memory.resize(65536, 0);
     }
 
-    int* getRegister(const string& reg) {
-        if (reg == "AX") return &AX;
-        if (reg == "BX") return &BX;
-        if (reg == "CX") return &CX;
-        if (reg == "DX") return &DX;
-        return nullptr;
+    int read(int address) {
+        return memory[address];
     }
 
-    int* parseOperand(const string& op, int& immediate) {
-        if (op.length() >= 3 && op[0] == '[' && op[op.length() - 1] == ']') {
-            string inside = op.substr(1, op.length() - 2);
-            int addr = stoi(inside);
-            if (addr >= 0 && addr < (int)memory.size()) {
-                return &memory[addr];
-            }
-            cout << "Error: invalid memory address " << addr << "\n";
-            return nullptr;
-        }
-
-        int* regPtr = getRegister(op);
-        if (regPtr != nullptr) return regPtr;
-
-        // Otherwise, it's immediate
-        immediate = stoi(op);
-        return nullptr;
-    }
-
-    void execute(const string& line) {
-        if (halted || line.empty()) return;
-
-        if (line == "HLT") {
-            halted = true;
-            return;
-        }
-
-        if (line.length() < 3) {
-            cout << "Invalid instruction: " << line << "\n";
-            return;
-        }
-
-        string instr = line.substr(0, 3);
-        string rest = line.substr(3);
-
-        size_t commaPos = rest.find(',');
-        string op1, op2;
-        if (commaPos == string::npos) {
-            op1 = rest;
-            op2 = "";
-        } else {
-            op1 = rest.substr(0, commaPos);
-            op2 = rest.substr(commaPos + 1);
-        }
-
-        int immediate = 0;
-        int* dest = parseOperand(op1, immediate);
-        int* src = nullptr;
-        if (!op2.empty()) {
-            src = parseOperand(op2, immediate);
-        }
-
-        if (instr == "MOV") {
-            if (dest == nullptr) {
-                cout << "Invalid MOV destination\n";
-                return;
-            }
-            if (src != nullptr) {
-                *dest = *src;
-            } else {
-                *dest = immediate;
-            }
-        } else if (instr == "ADD") {
-            if (dest == nullptr) {
-                cout << "Invalid ADD destination\n";
-                return;
-            }
-            if (src != nullptr) {
-                *dest = *dest + *src;
-            } else {
-                *dest = *dest + immediate;
-            }
-        } else if (instr == "SUB") {
-            if (dest == nullptr) {
-                cout << "Invalid SUB destination\n";
-                return;
-            }
-            if (src != nullptr) {
-                *dest = *dest - *src;
-            } else {
-                *dest = *dest - immediate;
-            }
-        } else if (instr == "MUL") {
-            if (dest == nullptr) {
-                cout << "Invalid MUL destination\n";
-                return;
-            }
-            if (src != nullptr) {
-                *dest = (*dest) * (*src);
-            } else {
-                *dest = (*dest) * immediate;
-            }
-        } else if (instr == "DIV") {
-            if (dest == nullptr) {
-                cout << "Invalid DIV destination\n";
-                return;
-            }
-            int divisor = src != nullptr ? *src : immediate;
-            if (divisor == 0) {
-                cout << "Error: division by zero\n";
-                return;
-            }
-            *dest = *dest / divisor;
-        } else {
-            cout << "Unknown instruction: " << instr << "\n";
-        }
+    void write(int address, int value) {
+        memory[address] = value;
     }
 
     void printSnapshot() {
-        cout << "\n--- CPU Snapshot ---\n";
-        cout << "AX=" << AX << "\n";
-        cout << "BX=" << BX << "\n";
-        cout << "CX=" << CX << "\n";
-        cout << "DX=" << DX << "\n";
-        cout << "\nMemory[0..15]:\n";
-        for (int i = 0; i < 16; i++) {
-            cout << "[" << i << "]=" << memory[i] << "\n";
+        for (int i = 0; i < 16; ++i) {
+            std::cout << i << " -> " << memory[i] << std::endl;
+        }
+    }
+
+private:
+    std::vector<int> memory;
+};
+
+class Registers {
+public:
+    Registers() {
+        // Initialize registers to 0
+        registers["AX"] = 0;
+        registers["BX"] = 0;
+        registers["CX"] = 0;
+        registers["DX"] = 0;
+    }
+
+    int get(const std::string& reg) {
+        return registers[reg];
+    }
+
+    void set(const std::string& reg, int value) {
+        registers[reg] = value;
+    }
+
+    void printSnapshot() {
+        std::cout << "AX: " << registers["AX"] << std::endl;
+        std::cout << "BX: " << registers["BX"] << std::endl;
+        std::cout << "CX: " << registers["CX"] << std::endl;
+        std::cout << "DX: " << registers["DX"] << std::endl;
+    }
+
+private:
+    std::unordered_map<std::string, int> registers;
+};
+
+class Processor {
+public:
+    Processor() : pc(0), running(true) {}
+
+    void loadInstructions(const std::vector<std::string>& instructions) {
+        this->instructions = instructions;
+    }
+
+    void execute(Memory& memory, Registers& registers) {
+        while (running && pc < instructions.size()) {
+            std::string instruction = instructions[pc];
+            parseAndExecute(instruction, memory, registers);
+            pc++;
+        }
+    }
+
+    void printSnapshot(Memory& memory, Registers& registers) {
+        std::cout << "Received Interrupt" << std::endl;
+        registers.printSnapshot();
+        memory.printSnapshot();
+    }
+
+private:
+    int pc; // Program Counter
+    bool running;
+    std::vector<std::string> instructions;
+
+    void parseAndExecute(const std::string& instruction, Memory& memory, Registers& registers) {
+        std::istringstream iss(instruction);
+        std::string op;
+        iss >> op;
+
+        if (op == "MOV") {
+            handleMOV(iss, memory, registers);
+        } else if (op == "ADD") {
+            handleADD(iss, registers);
+        } else if (op == "SUB") {
+            handleSUB(iss, registers);
+        } else if (op == "MUL") {
+            handleMUL(iss, registers);
+        } else if (op == "DIV") {
+            handleDIV(iss, registers);
+        } else if (op == "HLT") {
+            running = false;
+        }
+    }
+
+    void handleMOV(std::istringstream& iss, Memory& memory, Registers& registers) {
+        std::string dest, src;
+        iss >> dest >> src;
+
+        if (src[0] == '[') { // Memory address
+            int address = std::stoi(src.substr(1, src.size() - 2));
+            if (dest[0] == '[') { // Memory to Memory
+                int srcValue = memory.read(address);
+                int destAddress = std::stoi(dest.substr(1, dest.size() - 2));
+                memory.write(destAddress, srcValue);
+            } else { // Register to Memory
+                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), registers.get(src));
+            }
+        } else if (isdigit(src[0]) || src[0] == '-') { // Immediate value
+            if (dest[0] == '[') { // Memory
+                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), std::stoi(src));
+            } else { // Register
+                registers.set(dest, std::stoi(src));
+            }
+        } else { // Register to Register
+            registers.set(dest, registers.get(src));
+        }
+    }
+
+    void handleADD(std::istringstream& iss, Registers& registers) {
+        std::string dest, src;
+        iss >> dest >> src;
+        int value = (isdigit(src[0]) || src[0] == '-') ? std::stoi(src) : registers.get(src);
+        registers.set("AX", registers.get(dest) + value);
+    }
+
+    void handleSUB(std::istringstream& iss, Registers& registers) {
+        std::string dest, src;
+        iss >> dest >> src;
+        int value = (isdigit(src[0]) || src[0] == '-') ? std::stoi(src) : registers.get(src);
+        registers.set("AX", registers.get(dest) - value);
+    }
+
+    void handleMUL(std::istringstream& iss, Registers& registers) {
+        std::string dest;
+        int value;
+        iss >> dest >> value;
+        registers.set("AX", registers.get(dest) * value);
+    }
+
+    void handleDIV(std::istringstream& iss, Registers& registers) {
+        std::string dest;
+        iss >> dest;
+        int divisor = registers.get(dest);
+        if (divisor != 0) {
+            registers.set("AX", registers.get("AX") / divisor);
+        } else {
+            std::cerr << "Division by zero error!" << std::endl;
         }
     }
 };
 
 int main() {
-    CPU cpu;
+    Memory memory;
+    Registers registers;
+    Processor processor;
 
-    ifstream fin("input.txt");
-    if (!fin) {
-        cout << "Failed to open input.txt\n";
-        return 1;
+    // Read instructions from file
+    std::ifstream infile("instructions.txt");
+    std::vector<std::string> instructions;
+    std::string line;
+
+    while (std::getline(infile, line)) {
+        if (line == "HLT") {
+            instructions.push_back(line);
+            break;
+        }
+        instructions.push_back(line);
     }
 
-    string line;
-    while (getline(fin, line)) {
-        cpu.execute(line);
-        if (cpu.halted) break;
-    }
-
-    cout << "CPU halted.\n";
-    cpu.printSnapshot();
+    processor.loadInstructions(instructions);
+    processor.execute(memory, registers);
+    processor.printSnapshot(memory, registers);
 
     return 0;
+}
