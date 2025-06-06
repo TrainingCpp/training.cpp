@@ -8,26 +8,17 @@ using namespace std;
 class CPU {
 protected:
     int AX = 0, BX = 0, CX = 0, DX = 0;
-    vector<int> memory;  // Use vector instead of array
+    vector<int> memory;
     bool halted = false;
 
-    // Constructor initializes vector with 16 zeros
     CPU() {
         memory = vector<int>(16, 0);
     }
 
-    // Parses an instruction line into its parts
     void parse(const string& line, string& instr, string& op1, string& op2) {
-        instr = "";
-        op1 = "";
-        op2 = "";
+        instr = ""; op1 = ""; op2 = "";
 
         string code = line;
-
-        // Remove comments
-        size_t commentPos = code.find(';');
-        if (commentPos != string::npos)
-            code = code.substr(0, commentPos);
 
         // Replace commas with spaces
         while (code.find(',') != string::npos)
@@ -51,7 +42,7 @@ protected:
         if (!cleaned.empty() && cleaned.front() == ' ') cleaned.erase(0, 1);
         if (!cleaned.empty() && cleaned.back() == ' ') cleaned.pop_back();
 
-        // Split into tokens
+        // Tokenize
         size_t p1 = cleaned.find(' ');
         if (p1 == string::npos) {
             instr = cleaned;
@@ -69,7 +60,6 @@ protected:
         op2 = cleaned.substr(p2 + 1);
     }
 
-    // Returns pointer to register/memory or stores immediate value in imm
     int* getOperand(const string& op, int& imm) {
         if (op.size() >= 3 && op[0] == '[' && op.back() == ']') {
             int idx = stoi(op.substr(1, op.size() - 2));
@@ -87,8 +77,57 @@ protected:
         return nullptr;
     }
 
+    void handleMOV(int* dest, int* src, int imm) {
+        if (dest) {
+            if (src) *dest = *src;
+            else *dest = imm;
+        } else {
+            cout << "Invalid MOV destination\n";
+        }
+    }
+
+    void handleADD(int* dest, int* src, int imm) {
+        if (dest) {
+            if (src) *dest += *src;
+            else *dest += imm;
+        } else {
+            cout << "Invalid ADD destination\n";
+        }
+    }
+
+    void handleSUB(int* dest, int* src, int imm) {
+        if (dest) {
+            if (src) *dest -= *src;
+            else *dest -= imm;
+        } else {
+            cout << "Invalid SUB destination\n";
+        }
+    }
+
+    void handleMUL(int* dest, int* src, int imm) {
+        if (dest) {
+            if (src) *dest *= *src;
+            else *dest *= imm;
+        } else {
+            cout << "Invalid MUL destination\n";
+        }
+    }
+
+    void handleDIV(int* dest, int* src, int imm) {
+        if (dest) {
+            int divisor = src ? *src : imm;
+            if (divisor == 0) cout << "Division by zero!\n";
+            else *dest /= divisor;
+        } else {
+            cout << "Invalid DIV destination\n";
+        }
+    }
+
+    void handleHLT() {
+        halted = true;
+    }
+
 public:
-    // Execute one instruction line
     void execute(const string& line) {
         if (halted) return;
 
@@ -100,46 +139,15 @@ public:
         int* dest = getOperand(op1, imm);
         int* src = getOperand(op2, imm);
 
-        if (instr == "MOV") {
-            if (dest) {
-                if (src) *dest = *src;
-                else *dest = imm;
-            } else cout << "Invalid MOV destination\n";
-        }
-        else if (instr == "ADD") {
-            if (dest) {
-                if (src) *dest += *src;
-                else *dest += imm;
-            } else cout << "Invalid ADD destination\n";
-        }
-        else if (instr == "SUB") {
-            if (dest) {
-                if (src) *dest -= *src;
-                else *dest -= imm;
-            } else cout << "Invalid SUB destination\n";
-        }
-        else if (instr == "MUL") {
-            if (dest) {
-                if (src) *dest *= *src;
-                else *dest *= imm;
-            } else cout << "Invalid MUL destination\n";
-        }
-        else if (instr == "DIV") {
-            if (dest) {
-                int divisor = src ? *src : imm;
-                if (divisor == 0) cout << "Division by zero!\n";
-                else *dest /= divisor;
-            } else cout << "Invalid DIV destination\n";
-        }
-        else if (instr == "HLT") {
-            halted = true;
-        }
-        else {
-            cout << "Unknown instruction: " << instr << "\n";
-        }
+        if (instr == "MOV") handleMOV(dest, src, imm);
+        else if (instr == "ADD") handleADD(dest, src, imm);
+        else if (instr == "SUB") handleSUB(dest, src, imm);
+        else if (instr == "MUL") handleMUL(dest, src, imm);
+        else if (instr == "DIV") handleDIV(dest, src, imm);
+        else if (instr == "HLT") handleHLT();
+        else cout << "Unknown instruction: " << instr << "\n";
     }
 
-    // Show the register and memory state
     void dump() {
         cout << "\n=== CPU STATE ===\n";
         cout << "AX: " << AX << "\n";
@@ -154,14 +162,13 @@ public:
 
     bool isHalted() { return halted; }
 
-    // Static method to create an instance (since constructor is protected)
     static CPU create() {
         return CPU();
     }
 };
 
 int main() {
-    CPU cpu = CPU::create(); // Create CPU with vector memory
+    CPU cpu = CPU::create();
 
     ifstream file("input.txt");
     if (!file.is_open()) {
