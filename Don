@@ -1,3 +1,301 @@
+//network traffic analysis 
+
+#include <iostream>
+#include <queue>
+#include <vector>
+#include <string>
+#include <thread>
+#include <mutex>
+#include <fstream>
+#include <map>
+#include <algorithm>
+#include <random>
+#include <chrono>
+
+using namespace std;
+
+struct Packet {
+    string source;
+    string destination;
+    int size; // Size in KB
+
+    Packet(const string& src, const string& dest, int sz) : source(src), destination(dest), size(sz) {}
+};
+
+// Router class
+class Router {
+private:
+    string routerId;
+    queue<Packet> packetQueue;
+    vector<Packet> processedPackets;
+    mutex mtx;
+
+public:
+    Router(const string& id) : routerId(id) {}
+
+    void addPacket(const Packet& packet) {
+        lock_guard<mutex> lock(mtx);
+        packetQueue.push(packet);
+    }
+
+    void processPackets() {
+        lock_guard<mutex> lock(mtx);
+        while (!packetQueue.empty()) {
+            Packet packet = packetQueue.front();
+            packetQueue.pop();
+            processedPackets.push_back(packet);
+        }
+    }
+
+    void logProcessedPackets() const {
+        lock_guard<mutex> lock(mtx);
+        ofstream logFile(routerId + "_traffic.log");
+
+        for (const auto& packet : processedPackets) {
+            logFile << "Source: " << packet.source << ", Destination: " << packet.destination
+                    << ", Size: " << packet.size << "KB\n";
+        }
+        logFile.close();
+    }
+
+    int getTotalTraffic() const {
+        lock_guard<mutex> lock(mtx);
+        int totalTraffic = 0;
+        for (const auto& packet : processedPackets) {
+            totalTraffic += packet.size;
+        }
+        return totalTraffic;
+    }
+
+    string getRouterId() const { return routerId; }
+};
+
+// Traffic Analyzer
+class TrafficAnalyzer {
+private:
+    map<string, int> routerTrafficData;
+
+public:
+    void analyzeTraffic(const vector<Router>& routers) {
+        for (const auto& router : routers) {
+            routerTrafficData[router.getRouterId()] = router.getTotalTraffic();
+        }
+    }
+
+    void logTrafficAnalysis() const {
+        ofstream analysisFile("traffic_analysis.log");
+
+        analysisFile << "Router Traffic Analysis:\n";
+        analysisFile << "-------------------------\n";
+
+        for (const auto& [routerId, totalTraffic] : routerTrafficData) {
+            analysisFile << "Router: " << routerId << ", Total Traffic: " << totalTraffic << "KB\n";
+        }
+
+        analysisFile.close();
+    }
+};
+
+// Generate random packets for simulation
+void generatePackets(Router& router) {
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution<> sizeDist(1, 500);
+    uniform_int_distribution<> ipDist(1, 255);
+
+    for (int i = 0; i < 10; ++i) {
+        string srcIP = "192.168.1." + to_string(ipDist(gen));
+        string destIP = "10.0.0." + to_string(ipDist(gen));
+        int size = sizeDist(gen);
+        router.addPacket(Packet(srcIP, destIP, size));
+    }
+}
+
+// Process packets at a router
+void processRouterPackets(Router& router) {
+    router.processPackets();
+    router.logProcessedPackets();
+}
+
+int main() {
+    vector<Router> routers = {Router("Router1"), Router("Router2"), Router("Router3")};
+
+    // Step 1: Generate packets
+    vector<thread> packetThreads;
+    for (auto& router : routers) {
+        packetThreads.emplace_back(generatePackets, ref(router));
+    }
+    for (auto& thread : packetThreads) {
+        thread.join();
+    }
+
+    // Step 2: Process packets
+    vector<thread> processThreads;
+    for (auto& router : routers) {
+        processThreads.emplace_back(processRouterPackets, ref(router));
+    }
+    for (auto& thread : processThreads) {
+        thread.join();
+    }
+
+    // Step 3: Analyze traffic
+    TrafficAnalyzer analyzer;
+    analyzer.analyzeTraffic(routers);
+    analyzer.logTrafficAnalysis();
+
+    cout << "Traffic analysis completed. Check logs for details.\n";
+    return 0;
+}
+
+#include <iostream>
+#include <queue>
+#include <vector>
+#include <string>
+#include <thread>
+#include <mutex>
+#include <fstream>
+#include <map>
+#include <algorithm>
+#include <random>
+#include <chrono>
+
+using namespace std;
+
+struct Packet {
+    string source;
+    string destination;
+    int size; // Size in KB
+
+    Packet(const string& src, const string& dest, int sz) : source(src), destination(dest), size(sz) {}
+};
+
+// Router class
+class Router {
+private:
+    string routerId;
+    queue<Packet> packetQueue;
+    vector<Packet> processedPackets;
+    mutex mtx;
+
+public:
+    Router(const string& id) : routerId(id) {}
+
+    void addPacket(const Packet& packet) {
+        lock_guard<mutex> lock(mtx);
+        packetQueue.push(packet);
+    }
+
+    void processPackets() {
+        lock_guard<mutex> lock(mtx);
+        while (!packetQueue.empty()) {
+            Packet packet = packetQueue.front();
+            packetQueue.pop();
+            processedPackets.push_back(packet);
+        }
+    }
+
+    void logProcessedPackets() const {
+        lock_guard<mutex> lock(mtx);
+        ofstream logFile(routerId + "_traffic.log");
+
+        for (const auto& packet : processedPackets) {
+            logFile << "Source: " << packet.source << ", Destination: " << packet.destination
+                    << ", Size: " << packet.size << "KB\n";
+        }
+        logFile.close();
+    }
+
+    int getTotalTraffic() const {
+        lock_guard<mutex> lock(mtx);
+        int totalTraffic = 0;
+        for (const auto& packet : processedPackets) {
+            totalTraffic += packet.size;
+        }
+        return totalTraffic;
+    }
+
+    string getRouterId() const { return routerId; }
+};
+
+// Traffic Analyzer
+class TrafficAnalyzer {
+private:
+    map<string, int> routerTrafficData;
+
+public:
+    void analyzeTraffic(const vector<Router>& routers) {
+        for (const auto& router : routers) {
+            routerTrafficData[router.getRouterId()] = router.getTotalTraffic();
+        }
+    }
+
+    void logTrafficAnalysis() const {
+        ofstream analysisFile("traffic_analysis.log");
+
+        analysisFile << "Router Traffic Analysis:\n";
+        analysisFile << "-------------------------\n";
+
+        for (const auto& [routerId, totalTraffic] : routerTrafficData) {
+            analysisFile << "Router: " << routerId << ", Total Traffic: " << totalTraffic << "KB\n";
+        }
+
+        analysisFile.close();
+    }
+};
+
+// Generate random packets for simulation
+void generatePackets(Router& router) {
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution<> sizeDist(1, 500);
+    uniform_int_distribution<> ipDist(1, 255);
+
+    for (int i = 0; i < 10; ++i) {
+        string srcIP = "192.168.1." + to_string(ipDist(gen));
+        string destIP = "10.0.0." + to_string(ipDist(gen));
+        int size = sizeDist(gen);
+        router.addPacket(Packet(srcIP, destIP, size));
+    }
+}
+
+// Process packets at a router
+void processRouterPackets(Router& router) {
+    router.processPackets();
+    router.logProcessedPackets();
+}
+
+int main() {
+    vector<Router> routers = {Router("Router1"), Router("Router2"), Router("Router3")};
+
+    // Step 1: Generate packets
+    vector<thread> packetThreads;
+    for (auto& router : routers) {
+        packetThreads.emplace_back(generatePackets, ref(router));
+    }
+    for (auto& thread : packetThreads) {
+        thread.join();
+    }
+
+    // Step 2: Process packets
+    vector<thread> processThreads;
+    for (auto& router : routers) {
+        processThreads.emplace_back(processRouterPackets, ref(router));
+    }
+    for (auto& thread : processThreads) {
+        thread.join();
+    }
+
+    // Step 3: Analyze traffic
+    TrafficAnalyzer analyzer;
+    analyzer.analyzeTraffic(routers);
+    analyzer.logTrafficAnalysis();
+
+    cout << "Traffic analysis completed. Check logs for details.\n";
+    return 0;
+}
+
+
+
 //cellular network optimization 
 
 
