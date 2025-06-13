@@ -1,400 +1,115 @@
+//call routing system 
+#include <iostream> #include <thread> #include <queue> #include <unordered_map> #include <mutex> #include <vector> #include <string> #include <fstream> #include <chrono> #include <condition_variable> #include <set>
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <string>
-#include <unordered_map>
+using namespace std;
 
-class Memory {
-public:
-    Memory() {
-        // Initialize memory with 64KB (65536 bytes)
-        memory.resize(65536, 0);
-    }
+class Call { public: string callId; string source; string destination; int priority;
 
-    int read(int address) {
-        return memory[address];
-    }
+Call(string id, string src, string dest, int prio)
+    : callId(id), source(src), destination(dest), priority(prio) {}
 
-    void write(int address, int value) {
-        memory[address] = value;
-    }
-
-    void printSnapshot() {
-        for (int i = 0; i < 16; ++i) {
-            std::cout << i << " -> " << memory[i] << std::endl;
-        }
-    }
-
-private:
-    std::vector<int> memory;
-};
-
-class Registers {
-public:
-    Registers() {
-        // Initialize registers to 0
-        registers["AX"] = 0;
-        registers["BX"] = 0;
-        registers["CX"] = 0;
-        registers["DX"] = 0;
-    }
-
-    int get(const std::string& reg) {
-        return registers[reg];
-    }
-
-    void set(const std::string& reg, int value) {
-        registers[reg] = value;
-    }
-
-    void printSnapshot() {
-        std::cout << "AX: " << registers["AX"] << std::endl;
-        std::cout << "BX: " << registers["BX"] << std::endl;
-        std::cout << "CX: " << registers["CX"] << std::endl;
-        std::cout << "DX: " << registers["DX"] << std::endl;
-    }
-
-private:
-    std::unordered_map<std::string, int> registers;
-};
-
-class Processor {
-public:
-    Processor() : pc(0), running(true) {}
-
-    void loadInstructions(const std::vector<std::string>& instructions) {
-        this->instructions = instructions;
-    }
-
-    void execute(Memory& memory, Registers& registers) {
-        while (running && pc < instructions.size()) {
-            std::string instruction = instructions[pc];
-            parseAndExecute(instruction, memory, registers);
-            pc++;
-        }
-    }
-
-    void printSnapshot(Memory& memory, Registers& registers) {
-        std::cout << "Received Interrupt" << std::endl;
-        registers.printSnapshot();
-        memory.printSnapshot();
-    }
-
-private:
-    int pc; // Program Counter
-    bool running;
-    std::vector<std::string> instructions;
-
-    void parseAndExecute(const std::string& instruction, Memory& memory, Registers& registers) {
-        size_t spacePos = instruction.find(' ');
-        std::string op = (spacePos == std::string::npos) ? instruction : instruction.substr(0, spacePos);
-
-        if (op == "MOV") {
-            handleMOV(instruction.substr(spacePos + 1), memory, registers);
-        } else if (op == "ADD") {
-            handleADD(instruction.substr(spacePos + 1), registers);
-        } else if (op == "SUB") {
-            handleSUB(instruction.substr(spacePos + 1), registers);
-        } else if (op == "MUL") {
-            handleMUL(instruction.substr(spacePos + 1), registers);
-        } else if (op == "DIV") {
-            handleDIV(instruction.substr(spacePos + 1), registers);
-        } else if (op == "HLT") {
-            running = false;
-        }
-    }
-
-    void handleMOV(const std::string& args, Memory& memory, Registers& registers) {
-        size_t spacePos = args.find(' ');
-        std::string dest = args.substr(0, spacePos);
-        std::string src = args.substr(spacePos + 1);
-
-        if (src[0] == '[') { // Memory address
-            int address = std::stoi(src.substr(1, src.size() - 2));
-            if (dest[0] == '[') { // Memory to Memory
-                int srcValue = memory.read(address);
-                int destAddress = std::stoi(dest.substr(1, dest.size() - 2));
-                memory.write(destAddress, srcValue);
-            } else { // Register to Memory
-                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), registers.get(src));
-            }
-        } else if (isNumeric(src)) { // Immediate value
-            if (dest[0] == '[') { // Memory
-                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), std::stoi(src));
-            } else { // Register
-                registers.set(dest, std::stoi(src));
-            }
-        } else { // Register to Register
-            registers.set(dest, registers.get(src));
-        }
-    }
-
-    void handleADD(const std::string& args, Registers& registers) {
-        size_t spacePos = args.find(' ');
-        std::string dest = args.substr(0, spacePos);
-        std::string src = args.substr(spacePos + 1);
-        int value = (isNumeric(src)) ? std::stoi(src) : registers.get(src);
-        registers.set("AX", registers.get(dest) + value);
-    }
-
-    void handleSUB(const std::string& args, Registers& registers) {
-        size_t spacePos = args.find(' ');
-        std::string dest = args.substr(0, spacePos);
-        std::string src = args.substr(spacePos + 1);
-        int value = (isNumeric(src)) ? std::stoi(src) : registers.get(src);
-        registers.set("AX", registers.get(dest) - value);
-    }
-
-    void handleMUL(const std::string& args, Registers& registers) {
-        size_t spacePos = args.find(' ');
-        std::string dest = args.substr(0, spacePos);
-        int value = std::stoi(args.substr(spacePos + 1));
-        registers.set("AX", registers.get(dest) * value);
-    }
-
-    void handleDIV(const std::string& args, Registers& registers) {
-        std::string dest = args;
-        int divisor = registers.get(dest);
-        if (divisor != 0) {
-            registers.set("AX", registers.get("AX") / divisor);
-        } else {
-            std::cerr << "Division by zero error!" << std::endl;
-        }
-    }
-
-    bool isNumeric(const std::string& str) {
-        if (str.empty()) return false;
-        if (str[0] == '-') {
-            if (str.size() == 1) return false; // Only a negative sign
-            for (size_t i = 1; i < str.size(); ++i) {
-                if (!std::isdigit(str[i])) return false;
-            }
-        } else {
-            for (char c : str) {
-                if (!std::isdigit(c)) return false;
-            }
-        }
-        return true;
-    }
-};
-
-int main() {
-    Memory memory;
-    Registers registers;
-    Processor processor;
-
-    // Read instructions from file
-    std::ifstream infile("instructions.txt");
-    std::vector<std::string> instructions;
-    std::string line;
-
-    while (std::getline(infile, line)) {
-        if (line == "HLT") {
-            instructions.push_back(line);
-            break;
-        }
-        instructions.push_back(line);
-    }
-
-    processor.loadInstructions(instructions);
-    processor.execute(memory, registers);
-    processor.printSnapshot(memory, registers);
-
-    return 0;
+bool operator<(const Call& other) const {
+    return priority < other.priority;  // Higher priority calls first
 }
 
-
-
-
-
-
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <string>
-#include <unordered_map>
-
-class Memory {
-public:
-    Memory() {
-        // Initialize memory with 64KB (65536 bytes)
-        memory.resize(65536, 0);
-    }
-
-    int read(int address) {
-        return memory[address];
-    }
-
-    void write(int address, int value) {
-        memory[address] = value;
-    }
-
-    void printSnapshot() {
-        for (int i = 0; i < 16; ++i) {
-            std::cout << i << " -> " << memory[i] << std::endl;
-        }
-    }
-
-private:
-    std::vector<int> memory;
 };
 
-class Registers {
-public:
-    Registers() {
-        // Initialize registers to 0
-        registers["AX"] = 0;
-        registers["BX"] = 0;
-        registers["CX"] = 0;
-        registers["DX"] = 0;
-    }
+class CallRouter { private: priority_queue<Call> callQueue; unordered_map<string, string> activeCalls; mutex mtx; condition_variable cv; bool running;
 
-    int get(const std::string& reg) {
-        return registers[reg];
-    }
+public: CallRouter() : running(true) {}
 
-    void set(const std::string& reg, int value) {
-        registers[reg] = value;
-    }
-
-    void printSnapshot() {
-        std::cout << "AX: " << registers["AX"] << std::endl;
-        std::cout << "BX: " << registers["BX"] << std::endl;
-        std::cout << "CX: " << registers["CX"] << std::endl;
-        std::cout << "DX: " << registers["DX"] << std::endl;
-    }
-
-private:
-    std::unordered_map<std::string, int> registers;
-};
-
-class Processor {
-public:
-    Processor() : pc(0), running(true) {}
-
-    void loadInstructions(const std::vector<std::string>& instructions) {
-        this->instructions = instructions;
-    }
-
-    void execute(Memory& memory, Registers& registers) {
-        while (running && pc < instructions.size()) {
-            std::string instruction = instructions[pc];
-            parseAndExecute(instruction, memory, registers);
-            pc++;
-        }
-    }
-
-    void printSnapshot(Memory& memory, Registers& registers) {
-        std::cout << "Received Interrupt" << std::endl;
-        registers.printSnapshot();
-        memory.printSnapshot();
-    }
-
-private:
-    int pc; // Program Counter
-    bool running;
-    std::vector<std::string> instructions;
-
-    void parseAndExecute(const std::string& instruction, Memory& memory, Registers& registers) {
-        std::istringstream iss(instruction);
-        std::string op;
-        iss >> op;
-
-        if (op == "MOV") {
-            handleMOV(iss, memory, registers);
-        } else if (op == "ADD") {
-            handleADD(iss, registers);
-        } else if (op == "SUB") {
-            handleSUB(iss, registers);
-        } else if (op == "MUL") {
-            handleMUL(iss, registers);
-        } else if (op == "DIV") {
-            handleDIV(iss, registers);
-        } else if (op == "HLT") {
-            running = false;
-        }
-    }
-
-    void handleMOV(std::istringstream& iss, Memory& memory, Registers& registers) {
-        std::string dest, src;
-        iss >> dest >> src;
-
-        if (src[0] == '[') { // Memory address
-            int address = std::stoi(src.substr(1, src.size() - 2));
-            if (dest[0] == '[') { // Memory to Memory
-                int srcValue = memory.read(address);
-                int destAddress = std::stoi(dest.substr(1, dest.size() - 2));
-                memory.write(destAddress, srcValue);
-            } else { // Register to Memory
-                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), registers.get(src));
-            }
-        } else if (isdigit(src[0]) || src[0] == '-') { // Immediate value
-            if (dest[0] == '[') { // Memory
-                memory.write(std::stoi(dest.substr(1, dest.size() - 2)), std::stoi(src));
-            } else { // Register
-                registers.set(dest, std::stoi(src));
-            }
-        } else { // Register to Register
-            registers.set(dest, registers.get(src));
-        }
-    }
-
-    void handleADD(std::istringstream& iss, Registers& registers) {
-        std::string dest, src;
-        iss >> dest >> src;
-        int value = (isdigit(src[0]) || src[0] == '-') ? std::stoi(src) : registers.get(src);
-        registers.set("AX", registers.get(dest) + value);
-    }
-
-    void handleSUB(std::istringstream& iss, Registers& registers) {
-        std::string dest, src;
-        iss >> dest >> src;
-        int value = (isdigit(src[0]) || src[0] == '-') ? std::stoi(src) : registers.get(src);
-        registers.set("AX", registers.get(dest) - value);
-    }
-
-    void handleMUL(std::istringstream& iss, Registers& registers) {
-        std::string dest;
-        int value;
-        iss >> dest >> value;
-        registers.set("AX", registers.get(dest) * value);
-    }
-
-    void handleDIV(std::istringstream& iss, Registers& registers) {
-        std::string dest;
-        iss >> dest;
-        int divisor = registers.get(dest);
-        if (divisor != 0) {
-            registers.set("AX", registers.get("AX") / divisor);
-        } else {
-            std::cerr << "Division by zero error!" << std::endl;
-        }
-    }
-};
-
-int main() {
-    Memory memory;
-    Registers registers;
-    Processor processor;
-
-    // Read instructions from file
-    std::ifstream infile("instructions.txt");
-    std::vector<std::string> instructions;
-    std::string line;
-
-    while (std::getline(infile, line)) {
-        if (line == "HLT") {
-            instructions.push_back(line);
-            break;
-        }
-        instructions.push_back(line);
-    }
-
-    processor.loadInstructions(instructions);
-    processor.execute(memory, registers);
-    processor.printSnapshot(memory, registers);
-
-    return 0;
+void addCall(const Call& call) {
+    lock_guard<mutex> lock(mtx);
+    callQueue.push(call);
+    cv.notify_one();
 }
+
+void processCalls() {
+    while (running) {
+        unique_lock<mutex> lock(mtx);
+        cv.wait(lock, [&] { return !callQueue.empty() || !running; });
+
+        if (!running) break;
+
+        Call call = callQueue.top();
+        callQueue.pop();
+        lock.unlock();
+
+        // Simulate call routing
+        {
+            lock_guard<mutex> lock(mtx);
+            activeCalls[call.callId] = call.destination;
+        }
+
+        cout << "Routing call " << call.callId << " from " << call.source
+             << " to " << call.destination << " with priority " << call.priority << endl;
+
+        this_thread::sleep_for(chrono::seconds(2)); // Simulating processing time
+
+        // Simulate call end
+        {
+            lock_guard<mutex> lock(mtx);
+            activeCalls.erase(call.callId);
+            cout << "Call " << call.callId << " has ended." << endl;
+        }
+    }
+}
+
+void stop() {
+    running = false;
+    cv.notify_all();
+}
+
+void logActiveCalls() {
+    lock_guard<mutex> lock(mtx);
+    ofstream logFile("active_calls.txt", ios::app);
+    logFile << "Active Calls at " << chrono::system_clock::to_time_t(chrono::system_clock::now()) << ":\n";
+    for (const auto& call : activeCalls) {
+        logFile << "Call ID: " << call.first << " -> Destination: " << call.second << endl;
+    }
+    logFile.close();
+}
+
+};
+
+int main() { CallRouter router;
+
+thread routerThread(&CallRouter::processCalls, &router);
+
+vector<thread> callerThreads;
+
+// Simulating callers adding calls
+for (int i = 1; i <= 5; ++i) {
+    callerThreads.push_back(thread([&, i]() {
+        string callId = "Call" + to_string(i);
+        string source = "User" + to_string(i);
+        string destination = "User" + to_string(i + 5);
+        int priority = rand() % 10 + 1; // Priority between 1 and 10
+        router.addCall(Call(callId, source, destination, priority));
+    }));
+    this_thread::sleep_for(chrono::seconds(1));
+}
+
+// Wait for all caller threads to finish
+for (auto& t : callerThreads) {
+    t.join();
+}
+
+// Log active calls periodically
+thread loggerThread([&]() {
+    for (int i = 0; i < 5; ++i) {
+        router.logActiveCalls();
+        this_thread::sleep_for(chrono::seconds(3));
+    }
+});
+
+loggerThread.join();
+
+// Stop the router and join the router thread
+router.stop();
+routerThread.join();
+
+return 0;
+
+}
+
