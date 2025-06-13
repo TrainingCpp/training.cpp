@@ -1,3 +1,142 @@
+//telecom customer feedback analyer
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+#include <thread>
+#include <mutex>
+#include <fstream>
+#include <string>
+#include <algorithm>
+
+using namespace std;
+
+// Base Feedback class
+class Feedback {
+protected:
+    string message;
+
+public:
+    Feedback(const string& msg) : message(msg) {}
+    virtual void analyze(unordered_map<string, int>& keywordCounts) const = 0;
+    virtual ~Feedback() = default;
+};
+
+// Derived class for Call Quality Feedback
+class CallQualityFeedback : public Feedback {
+public:
+    CallQualityFeedback(const string& msg) : Feedback(msg) {}
+
+    void analyze(unordered_map<string, int>& keywordCounts) const override {
+        vector<string> keywords = {"call drop", "noise", "clarity"};
+        for (const auto& keyword : keywords) {
+            if (message.find(keyword) != string::npos) {
+                keywordCounts[keyword]++;
+            }
+        }
+    }
+};
+
+// Derived class for Billing Feedback
+class BillingFeedback : public Feedback {
+public:
+    BillingFeedback(const string& msg) : Feedback(msg) {}
+
+    void analyze(unordered_map<string, int>& keywordCounts) const override {
+        vector<string> keywords = {"overcharged", "bill", "refund"};
+        for (const auto& keyword : keywords) {
+            if (message.find(keyword) != string::npos) {
+                keywordCounts[keyword]++;
+            }
+        }
+    }
+};
+
+// Derived class for General Feedback
+class GeneralFeedback : public Feedback {
+public:
+    GeneralFeedback(const string& msg) : Feedback(msg) {}
+
+    void analyze(unordered_map<string, int>& keywordCounts) const override {
+        vector<string> keywords = {"service", "support", "experience"};
+        for (const auto& keyword : keywords) {
+            if (message.find(keyword) != string::npos) {
+                keywordCounts[keyword]++;
+            }
+        }
+    }
+};
+
+// Telecom Customer Feedback Analyzer
+class FeedbackAnalyzer {
+private:
+    vector<Feedback*> feedbacks;
+    mutex mtx;
+
+public:
+    void addFeedback(Feedback* feedback) {
+        lock_guard<mutex> lock(mtx);
+        feedbacks.push_back(feedback);
+    }
+
+    void analyzeFeedback(const string& region) {
+        unordered_map<string, int> keywordCounts;
+
+        {
+            lock_guard<mutex> lock(mtx);
+            for (const auto& feedback : feedbacks) {
+                feedback->analyze(keywordCounts);
+            }
+        }
+
+        ofstream outFile(region + "_feedback_summary.txt");
+        outFile << "Feedback Summary for Region: " << region << "\n";
+        for (const auto& entry : keywordCounts) {
+            outFile << entry.first << ": " << entry.second << "\n";
+        }
+        outFile.close();
+    }
+
+    ~FeedbackAnalyzer() {
+        for (auto feedback : feedbacks) {
+            delete feedback;
+        }
+    }
+};
+
+// Simulate feedback processing for a specific region
+void simulateRegionFeedback(FeedbackAnalyzer& analyzer, const string& region) {
+    analyzer.analyzeFeedback(region);
+}
+
+int main() {
+    FeedbackAnalyzer analyzer;
+
+    // Add feedback for analysis
+    analyzer.addFeedback(new CallQualityFeedback("The call had a lot of noise and clarity issues."));
+    analyzer.addFeedback(new BillingFeedback("I was overcharged in my last bill."));
+    analyzer.addFeedback(new GeneralFeedback("The customer service experience was excellent."));
+    analyzer.addFeedback(new CallQualityFeedback("The call dropped multiple times during my conversation."));
+    analyzer.addFeedback(new BillingFeedback("I need a refund for the extra charge."));
+    analyzer.addFeedback(new GeneralFeedback("Overall service support has been great."));
+
+    // Simulate feedback analysis for different regions
+    vector<thread> threads;
+    threads.emplace_back(simulateRegionFeedback, ref(analyzer), "North");
+    threads.emplace_back(simulateRegionFeedback, ref(analyzer), "South");
+    threads.emplace_back(simulateRegionFeedback, ref(analyzer), "East");
+    threads.emplace_back(simulateRegionFeedback, ref(analyzer), "West");
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    cout << "Feedback analysis completed. Check region-specific feedback summary files.\n";
+
+    return 0;
+}
+
+
+
 //realtime sms broadcast system 
 
 
