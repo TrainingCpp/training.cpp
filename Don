@@ -1,3 +1,131 @@
+//spam detection system 
+
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <thread>
+#include <mutex>
+#include <algorithm>
+
+using namespace std;
+
+// Base class Message
+class Message {
+protected:
+    string content;
+    bool isSpam;
+
+public:
+    Message(const string& msg) : content(msg), isSpam(false) {}
+    virtual ~Message() = default;
+
+    virtual string getMessageType() const = 0;
+
+    const string& getContent() const { return content; }
+    bool checkSpam() const { return isSpam; }
+    void markSpam() { isSpam = true; }
+};
+
+// Derived class SMS
+class SMS : public Message {
+public:
+    SMS(const string& msg) : Message(msg) {}
+    string getMessageType() const override { return "SMS"; }
+};
+
+// Derived class MMS
+class MMS : public Message {
+public:
+    MMS(const string& msg) : Message(msg) {}
+    string getMessageType() const override { return "MMS"; }
+};
+
+// Thread-safe structure to handle message processing
+class SpamDetector {
+private:
+    unordered_map<string, int> spamKeywords;
+    vector<shared_ptr<Message>> messages;
+    mutex mtx;
+
+public:
+    SpamDetector() {
+        // Initialize spam keywords with scores
+        spamKeywords = {
+            {"win", 10}, {"prize", 8}, {"free", 7}, {"money", 9},
+            {"urgent", 6}, {"call", 5}, {"offer", 4}, {"cash", 10}
+        };
+    }
+
+    void addMessage(shared_ptr<Message> message) {
+        lock_guard<mutex> lock(mtx);
+        messages.push_back(message);
+    }
+
+    void processMessages() {
+        vector<shared_ptr<Message>> localMessages;
+
+        {
+            lock_guard<mutex> lock(mtx);
+            localMessages.swap(messages);
+        }
+
+        for (auto& message : localMessages) {
+            int spamScore = 0;
+
+            for (const auto& [keyword, score] : spamKeywords) {
+                if (message->getContent().find(keyword) != string::npos) {
+                    spamScore += score;
+                }
+            }
+
+            if (spamScore > 15) {
+                message->markSpam();
+            }
+        }
+    }
+
+    void logResults(const string& logFilename) {
+        ofstream logfile(logFilename, ios::app);
+
+        for (const auto& message : messages) {
+            logfile << "Message Type: " << message->getMessageType() << "\n";
+            logfile << "Content: " << message->getContent() << "\n";
+            logfile << "Status: " << (message->checkSpam() ? "Spam" : "Not Spam") << "\n\n";
+        }
+    }
+};
+
+void processBatch(SpamDetector& detector) {
+    detector.processMessages();
+    detector.logResults("spam_detection.log");
+}
+
+int main() {
+    SpamDetector detector;
+
+    // Simulate incoming messages
+    detector.addMessage(make_shared<SMS>("You won a free prize! Call now!"));
+    detector.addMessage(make_shared<MMS>("This is a test message."));
+    detector.addMessage(make_shared<SMS>("Urgent! You have cash waiting for you."));
+
+    // Multithreaded processing
+    thread t1(processBatch, ref(detector));
+    thread t2(processBatch, ref(detector));
+
+    t1.join();
+    t2.join();
+
+    cout << "Spam detection completed. Check spam_detection.log for details.\n";
+
+    return 0;
+}
+
+
+
+
+
 //call routing system 
 #include <iostream> #include <thread> #include <queue> #include <unordered_map> #include <mutex> #include <vector> #include <string> #include <fstream> #include <chrono> #include <condition_variable> #include <set>
 
