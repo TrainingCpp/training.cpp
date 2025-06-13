@@ -1,3 +1,124 @@
+#include <iostream>
+#include <vector>
+#include <string>
+
+using namespace std;
+
+// Class to represent operator data
+class Operator {
+private:
+    string brandName;
+    string mccMncCode;
+
+    int incomingCallDuration;
+    int outgoingCallDuration;
+    int incomingSMS;
+    int outgoingSMS;
+
+    double mbDownloaded;
+    double mbUploaded;
+
+public:
+    Operator(const string& name, const string& code,
+             int inCall, int outCall, int inSMS, int outSMS,
+             double mbDown, double mbUp)
+        : brandName(name), mccMncCode(code),
+          incomingCallDuration(inCall), outgoingCallDuration(outCall),
+          incomingSMS(inSMS), outgoingSMS(outSMS),
+          mbDownloaded(mbDown), mbUploaded(mbUp) {}
+
+    void display() const {
+        cout << "Operator Brand: " << brandName << " (" << mccMncCode << ")\n";
+        cout << "\tIncoming voice call durations: " << incomingCallDuration << "\n";
+        cout << "\tOutgoing voice call durations: " << outgoingCallDuration << "\n";
+        cout << "\tIncoming SMS messages: " << incomingSMS << "\n";
+        cout << "\tOutgoing SMS messages: " << outgoingSMS << "\n";
+        cout << "\tMB downloaded: " << mbDownloaded << " | MB uploaded: " << mbUploaded << "\n\n";
+    }
+};
+
+// Class to represent customer data
+class Customer {
+private:
+    int customerID;
+    string operatorName;
+
+    int inCallWithinOperator;
+    int outCallWithinOperator;
+    int inSMSWithinOperator;
+    int outSMSWithinOperator;
+
+    int inCallOutsideOperator;
+    int outCallOutsideOperator;
+    int inSMSOutsideOperator;
+    int outSMSOutsideOperator;
+
+    double mbDownloaded;
+    double mbUploaded;
+
+public:
+    Customer(int id, const string& opName,
+             int inCallWithin, int outCallWithin, int inSMSWithin, int outSMSWithin,
+             int inCallOutside, int outCallOutside, int inSMSOutside, int outSMSOutside,
+             double mbDown, double mbUp)
+        : customerID(id), operatorName(opName),
+          inCallWithinOperator(inCallWithin), outCallWithinOperator(outCallWithin),
+          inSMSWithinOperator(inSMSWithin), outSMSWithinOperator(outSMSWithin),
+          inCallOutsideOperator(inCallOutside), outCallOutsideOperator(outCallOutside),
+          inSMSOutsideOperator(inSMSOutside), outSMSOutsideOperator(outSMSOutside),
+          mbDownloaded(mbDown), mbUploaded(mbUp) {}
+
+    void display() const {
+        cout << "Customer ID: " << customerID << " (" << operatorName << ")\n";
+        cout << "\t* Services within the mobile operator *\n";
+        cout << "\tIncoming voice call durations: " << inCallWithinOperator << "\n";
+        cout << "\tOutgoing voice call durations: " << outCallWithinOperator << "\n";
+        cout << "\tIncoming SMS messages: " << inSMSWithinOperator << "\n";
+        cout << "\tOutgoing SMS messages: " << outSMSWithinOperator << "\n";
+        cout << "\t* Services outside the mobile operator *\n";
+        cout << "\tIncoming voice call durations: " << inCallOutsideOperator << "\n";
+        cout << "\tOutgoing voice call durations: " << outCallOutsideOperator << "\n";
+        cout << "\tIncoming SMS messages: " << inSMSOutsideOperator << "\n";
+        cout << "\tOutgoing SMS messages: " << outSMSOutsideOperator << "\n";
+        cout << "\t* Internet use *\n";
+        cout << "\tMB downloaded: " << mbDownloaded << " | MB uploaded: " << mbUploaded << "\n\n";
+    }
+};
+
+int main() {
+    vector<Operator> operators = {
+        {"Cellcom", "42500", 844736, 874157, 4000, 3990, 408486, 416108},
+        {"012", "42504", 862576, 855646, 3905, 3998, 435195, 422003},
+        {"Airtel", "42503", 853500, 882069, 3990, 3986, 429235, 432627},
+        {"Partner", "42501", 883043, 851048, 3940, 4017, 439487, 428699},
+        {"JIO", "42502", 876475, 879242, 3907, 4088, 445752, 418127}
+    };
+
+    vector<Customer> customers = {
+        {1522840, "JIO", 0, 0, 0, 0, 0, 312, 0, 0, 0, 0},
+        {1169862, "012", 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+        {1964107, "Airtel", 0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+        {1280634, "JIO", 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+        {1952023, "Partner", 0, 0, 0, 0, 347, 0, 0, 0, 0, 0}
+    };
+
+    // Display operator data
+    cout << "# Operator Data Base:\n";
+    for (const auto& op : operators) {
+        op.display();
+    }
+
+    // Display customer data
+    cout << "# Customers Data Base:\n";
+    for (const auto& cust : customers) {
+        cust.display();
+    }
+
+    return 0;
+}
+
+
+
 //telecom customer feedback analyer
 #include <iostream>
 #include <vector>
