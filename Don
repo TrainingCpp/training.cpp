@@ -1,3 +1,138 @@
+//telecom billing system 
+
+#include <iostream>
+#include <map>
+#include <queue>
+#include <vector>
+#include <string>
+#include <thread>
+#include <mutex>
+#include <fstream>
+#include <random>
+#include <chrono>
+
+using namespace std;
+
+// Class to represent a telecom service
+class Service {
+private:
+    string serviceName;
+    double costPerUnit;
+
+public:
+    Service(const string& name, double cost) : serviceName(name), costPerUnit(cost) {}
+    double getCostPerUnit() const { return costPerUnit; }
+    string getServiceName() const { return serviceName; }
+};
+
+// Class to represent a user
+class User {
+private:
+    string username;
+    map<string, int> serviceUsage; // Service name and usage
+
+public:
+    User(const string& name) : username(name) {}
+
+    void addServiceUsage(const string& serviceName, int units) {
+        serviceUsage[serviceName] += units;
+    }
+
+    const map<string, int>& getServiceUsage() const { return serviceUsage; }
+    string getUsername() const { return username; }
+};
+
+// Class to represent a billing system
+class BillingSystem {
+private:
+    map<string, Service> services;
+    map<string, User> users;
+    mutex mtx;
+
+public:
+    void addService(const string& name, double cost) {
+        lock_guard<mutex> lock(mtx);
+        services[name] = Service(name, cost);
+    }
+
+    void addUser(const string& username) {
+        lock_guard<mutex> lock(mtx);
+        users[username] = User(username);
+    }
+
+    void generateUsageData() {
+        lock_guard<mutex> lock(mtx);
+
+        random_device rd;
+        mt19937 gen(rd());
+        uniform_int_distribution<> dist(1, 100);
+
+        for (auto& [username, user] : users) {
+            for (const auto& [serviceName, service] : services) {
+                user.addServiceUsage(serviceName, dist(gen)); // Random usage
+            }
+        }
+    }
+
+    void generateBills() {
+        lock_guard<mutex> lock(mtx);
+
+        for (const auto& [username, user] : users) {
+            double totalBill = 0;
+            ofstream billFile(username + "_bill.txt");
+
+            billFile << "Monthly Bill for User: " << username << "\n";
+            billFile << "----------------------------------\n";
+
+            for (const auto& [serviceName, usage] : user.getServiceUsage()) {
+                double cost = services[serviceName].getCostPerUnit() * usage;
+                totalBill += cost;
+                billFile << "Service: " << serviceName << ", Usage: " << usage 
+                         << ", Cost: $" << cost << "\n";
+            }
+
+            billFile << "----------------------------------\n";
+            billFile << "Total Bill: $" << totalBill << "\n";
+            billFile.close();
+        }
+    }
+};
+
+void simulateUserUsage(BillingSystem& system) {
+    system.generateUsageData();
+}
+
+void simulateBilling(BillingSystem& system) {
+    system.generateBills();
+}
+
+int main() {
+    BillingSystem billingSystem;
+
+    // Adding services
+    billingSystem.addService("Voice Call", 0.1);  // $0.1 per minute
+    billingSystem.addService("Data", 0.05);       // $0.05 per MB
+    billingSystem.addService("SMS", 0.02);        // $0.02 per SMS
+
+    // Adding users
+    billingSystem.addUser("Alice");
+    billingSystem.addUser("Bob");
+    billingSystem.addUser("Charlie");
+
+    // Simulate usage and billing
+    thread usageThread(simulateUserUsage, ref(billingSystem));
+    thread billingThread(simulateBilling, ref(billingSystem));
+
+    usageThread.join();
+    billingThread.join();
+
+    cout << "Billing completed. Check individual user bill files for details.\n";
+
+    return 0;
+}
+
+
+
 //spam detection system 
 
 #include <iostream>
