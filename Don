@@ -1,3 +1,125 @@
+//realtime sms broadcast system 
+
+
+#include <iostream>
+#include <unordered_map>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <chrono>
+
+using namespace std;
+
+// Base Message class
+class Message {
+protected:
+    string content;
+
+public:
+    Message(const string& msgContent) : content(msgContent) {}
+    virtual void display() const = 0; // Pure virtual function
+    virtual ~Message() = default;
+};
+
+// Derived BroadcastMessage class
+class BroadcastMessage : public Message {
+private:
+    string region;
+
+public:
+    BroadcastMessage(const string& msgContent, const string& msgRegion)
+        : Message(msgContent), region(msgRegion) {}
+
+    void display() const override {
+        cout << "Region: " << region << ", Message: " << content << endl;
+    }
+
+    string getRegion() const {
+        return region;
+    }
+};
+
+// SMS Broadcasting System
+class SMSBroadcastingSystem {
+private:
+    unordered_map<string, queue<BroadcastMessage>> regionQueues;
+    mutex mtx;
+
+public:
+    void addSubscriberRegion(const string& region) {
+        lock_guard<mutex> lock(mtx);
+        if (regionQueues.find(region) == regionQueues.end()) {
+            regionQueues[region] = queue<BroadcastMessage>();
+        }
+    }
+
+    void addBroadcastMessage(const BroadcastMessage& message) {
+        lock_guard<mutex> lock(mtx);
+        const string& region = message.getRegion();
+        if (regionQueues.find(region) != regionQueues.end()) {
+            regionQueues[region].push(message);
+        }
+    }
+
+    void broadcastMessages(const string& region) {
+        lock_guard<mutex> lock(mtx);
+        if (regionQueues.find(region) == regionQueues.end()) return;
+
+        ofstream logFile(region + "_broadcast.log", ios::app);
+        while (!regionQueues[region].empty()) {
+            BroadcastMessage message = regionQueues[region].front();
+            regionQueues[region].pop();
+            message.display();
+            logFile << "Region: " << message.getRegion() << ", Message: " << message.content << endl;
+        }
+        logFile.close();
+    }
+};
+
+// Simulate real-time broadcasting for a specific region
+void simulateRegionBroadcast(SMSBroadcastingSystem& system, const string& region) {
+    this_thread::sleep_for(chrono::seconds(1)); // Simulate processing delay
+    system.broadcastMessages(region);
+}
+
+int main() {
+    SMSBroadcastingSystem system;
+
+    // Add regions
+    system.addSubscriberRegion("North");
+    system.addSubscriberRegion("South");
+    system.addSubscriberRegion("East");
+    system.addSubscriberRegion("West");
+
+    // Add messages
+    system.addBroadcastMessage(BroadcastMessage("Emergency Alert!", "North"));
+    system.addBroadcastMessage(BroadcastMessage("Maintenance Notification", "South"));
+    system.addBroadcastMessage(BroadcastMessage("Festival Greetings", "East"));
+    system.addBroadcastMessage(BroadcastMessage("Weather Warning", "West"));
+    system.addBroadcastMessage(BroadcastMessage("Traffic Update", "North"));
+    system.addBroadcastMessage(BroadcastMessage("Service Downtime", "South"));
+
+    // Simulate real-time broadcasting
+    vector<thread> threads;
+    threads.emplace_back(simulateRegionBroadcast, ref(system), "North");
+    threads.emplace_back(simulateRegionBroadcast, ref(system), "South");
+    threads.emplace_back(simulateRegionBroadcast, ref(system), "East");
+    threads.emplace_back(simulateRegionBroadcast, ref(system), "West");
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    cout << "Broadcasting completed. Check region-specific log files for details.\n";
+
+    return 0;
+}
+
+
+
 //telecom fruad detection system 
 
 #include <iostream>
