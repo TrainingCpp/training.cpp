@@ -1,3 +1,182 @@
+//cellular network optimization 
+
+
+#include <iostream>
+#include <map>
+#include <set>
+#include <vector>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <fstream>
+#include <string>
+#include <climits>
+
+using namespace std;
+
+struct Tower {
+    string id;
+    int load; // Current data load on the tower
+
+    Tower(string id, int load) : id(id), load(load) {}
+};
+
+class Network {
+private:
+    map<string, set<string>> connections; // Graph: Tower ID -> Set of connected Tower IDs
+    map<string, Tower> towers;            // Tower ID -> Tower
+    mutex mtx;
+
+public:
+    void addTower(const string& id, int load) {
+        lock_guard<mutex> lock(mtx);
+        towers[id] = Tower(id, load);
+    }
+
+    void addConnection(const string& from, const string& to) {
+        lock_guard<mutex> lock(mtx);
+        connections[from].insert(to);
+        connections[to].insert(from); // Assuming bidirectional connection
+    }
+
+    vector<string> findShortestPath(const string& start, const string& end) {
+        lock_guard<mutex> lock(mtx);
+
+        if (connections.find(start) == connections.end() || connections.find(end) == connections.end()) {
+            return {};
+        }
+
+        map<string, string> previous; // To reconstruct the path
+        map<string, int> distances;   // Shortest distance to each tower
+        set<string> visited;
+        priority_queue<pair<int, string>, vector<pair<int, string>>, greater<>> pq;
+
+        for (const auto& tower : towers) {
+            distances[tower.first] = INT_MAX;
+        }
+        distances[start] = 0;
+
+        pq.push({0, start});
+
+        while (!pq.empty()) {
+            auto [currentDistance, currentTower] = pq.top();
+            pq.pop();
+
+            if (visited.find(currentTower) != visited.end()) {
+                continue;
+            }
+
+            visited.insert(currentTower);
+
+            for (const auto& neighbor : connections[currentTower]) {
+                int newDistance = currentDistance + 1; // All edges have equal weight
+                if (newDistance < distances[neighbor]) {
+                    distances[neighbor] = newDistance;
+                    previous[neighbor] = currentTower;
+                    pq.push({newDistance, neighbor});
+                }
+            }
+        }
+
+        vector<string> path;
+        for (string at = end; at != ""; at = previous[at]) {
+            path.push_back(at);
+        }
+        reverse(path.begin(), path.end());
+
+        return (path.size() > 1 && path.front() == start) ? path : vector<string>{};
+    }
+
+    void optimizeTraffic(const string& overloadedTower) {
+        lock_guard<mutex> lock(mtx);
+
+        if (towers[overloadedTower].load <= 100) {
+            return; // Load is manageable
+        }
+
+        cout << "Optimizing traffic for tower: " << overloadedTower << "\n";
+
+        for (const auto& neighbor : connections[overloadedTower]) {
+            int transferLoad = (towers[overloadedTower].load - 100) / 2;
+            towers[neighbor].load += transferLoad;
+            towers[overloadedTower].load -= transferLoad;
+
+            ofstream logFile("network_optimization.log", ios::app);
+            logFile << "Transferred " << transferLoad << " load from " << overloadedTower
+                    << " to " << neighbor << "\n";
+            logFile.close();
+
+            if (towers[overloadedTower].load <= 100) {
+                break;
+            }
+        }
+    }
+
+    void simulateTraffic() {
+        lock_guard<mutex> lock(mtx);
+
+        for (auto& [id, tower] : towers) {
+            tower.load += rand() % 50; // Simulating data load increase
+        }
+    }
+
+    void logTowerStatus() {
+        lock_guard<mutex> lock(mtx);
+
+        ofstream logFile("tower_status.log");
+        for (const auto& [id, tower] : towers) {
+            logFile << "Tower ID: " << id << ", Load: " << tower.load << "\n";
+        }
+        logFile.close();
+    }
+};
+
+// Simulate real-time traffic
+void simulateTraffic(Network& network) {
+    while (true) {
+        network.simulateTraffic();
+        this_thread::sleep_for(chrono::seconds(5));
+    }
+}
+
+// Optimize network
+void optimizeNetwork(Network& network) {
+    while (true) {
+        for (const auto& [id, tower] : network) {
+            if (tower.load > 100) {
+                network.optimizeTraffic(id);
+            }
+        }
+        this_thread::sleep_for(chrono::seconds(10));
+    }
+}
+
+int main() {
+    Network network;
+
+    // Adding towers
+    network.addTower("T1", 50);
+    network.addTower("T2", 30);
+    network.addTower("T3", 70);
+    network.addTower("T4", 40);
+
+    // Adding connections
+    network.addConnection("T1", "T2");
+    network.addConnection("T2", "T3");
+    network.addConnection("T3", "T4");
+
+    // Start traffic simulation and optimization in separate threads
+    thread trafficThread(simulateTraffic, ref(network));
+    thread optimizationThread(optimizeNetwork, ref(network));
+
+    trafficThread.join();
+    optimizationThread.join();
+
+    return 0;
+}
+
+
+
 //telecom billing system 
 
 #include <iostream>
