@@ -1,6 +1,147 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <algorithm>
+#include <exception>
+
+using namespace std;
+
+// Base class for displaying data
+class Displayable {
+public:
+    virtual void display() const = 0; // Pure virtual function
+    virtual ~Displayable() = default;
+};
+
+// Class for operator data
+class Operator : public Displayable {
+private:
+    string brandName;
+    string mccMncCode;
+
+    int incomingCallDuration;
+    int outgoingCallDuration;
+    int incomingSMS;
+    int outgoingSMS;
+
+    double mbDownloaded;
+    double mbUploaded;
+
+public:
+    Operator(string name, string code, int inCall, int outCall, int inSMS, int outSMS, double mbDown, double mbUp)
+        : brandName(move(name)), mccMncCode(move(code)),
+          incomingCallDuration(inCall), outgoingCallDuration(outCall),
+          incomingSMS(inSMS), outgoingSMS(outSMS),
+          mbDownloaded(mbDown), mbUploaded(mbUp) {}
+
+    void display() const override {
+        cout << "Operator Brand: " << brandName << " (" << mccMncCode << ")\n";
+        cout << "\tIncoming voice call durations: " << incomingCallDuration << "\n";
+        cout << "\tOutgoing voice call durations: " << outgoingCallDuration << "\n";
+        cout << "\tIncoming SMS messages: " << incomingSMS << "\n";
+        cout << "\tOutgoing SMS messages: " << outgoingSMS << "\n";
+        cout << "\tMB downloaded: " << mbDownloaded << " | MB uploaded: " << mbUploaded << "\n\n";
+    }
+};
+
+// Class for customer data
+class Customer : public Displayable {
+private:
+    int customerID;
+    string operatorName;
+
+    int inCallWithinOperator;
+    int outCallWithinOperator;
+    int inSMSWithinOperator;
+    int outSMSWithinOperator;
+
+    int inCallOutsideOperator;
+    int outCallOutsideOperator;
+    int inSMSOutsideOperator;
+    int outSMSOutsideOperator;
+
+    double mbDownloaded;
+    double mbUploaded;
+
+public:
+    Customer(int id, string opName, int inCallWithin, int outCallWithin, int inSMSWithin, int outSMSWithin,
+             int inCallOutside, int outCallOutside, int inSMSOutside, int outSMSOutside, double mbDown, double mbUp)
+        : customerID(id), operatorName(move(opName)),
+          inCallWithinOperator(inCallWithin), outCallWithinOperator(outCallWithin),
+          inSMSWithinOperator(inSMSWithin), outSMSWithinOperator(outSMSWithin),
+          inCallOutsideOperator(inCallOutside), outCallOutsideOperator(outCallOutside),
+          inSMSOutsideOperator(inSMSOutside), outSMSOutsideOperator(outSMSOutside),
+          mbDownloaded(mbDown), mbUploaded(mbUp) {}
+
+    void display() const override {
+        cout << "Customer ID: " << customerID << " (" << operatorName << ")\n";
+        cout << "\t* Services within the mobile operator *\n";
+        cout << "\tIncoming voice call durations: " << inCallWithinOperator << "\n";
+        cout << "\tOutgoing voice call durations: " << outCallWithinOperator << "\n";
+        cout << "\tIncoming SMS messages: " << inSMSWithinOperator << "\n";
+        cout << "\tOutgoing SMS messages: " << outSMSWithinOperator << "\n";
+        cout << "\t* Services outside the mobile operator *\n";
+        cout << "\tIncoming voice call durations: " << inCallOutsideOperator << "\n";
+        cout << "\tOutgoing voice call durations: " << outCallOutsideOperator << "\n";
+        cout << "\tIncoming SMS messages: " << inSMSOutsideOperator << "\n";
+        cout << "\tOutgoing SMS messages: " << outSMSOutsideOperator << "\n";
+        cout << "\t* Internet use *\n";
+        cout << "\tMB downloaded: " << mbDownloaded << " | MB uploaded: " << mbUploaded << "\n\n";
+    }
+};
+
+// Exception class for invalid data
+class InvalidDataException : public runtime_error {
+public:
+    explicit InvalidDataException(const string& message)
+        : runtime_error("Invalid Data: " + message) {}
+};
+
+int main() {
+    try {
+        // Database of Displayable objects
+        vector<Displayable*> database;
+
+        // Adding operator data
+        database.push_back(new Operator("Cellcom", "42500", 844736, 874157, 4000, 3990, 408486, 416108));
+        database.push_back(new Operator("012", "42504", 862576, 855646, 3905, 3998, 435195, 422003));
+        database.push_back(new Operator("Airtel", "42503", 853500, 882069, 3990, 3986, 429235, 432627));
+        database.push_back(new Operator("Partner", "42501", 883043, 851048, 3940, 4017, 439487, 428699));
+        database.push_back(new Operator("JIO", "42502", 876475, 879242, 3907, 4088, 445752, 418127));
+
+        // Adding customer data
+        database.push_back(new Customer(1522840, "JIO", 0, 0, 0, 0, 0, 312, 0, 0, 0, 0));
+        database.push_back(new Customer(1169862, "012", 0, 0, 0, 0, 0, 0, 1, 0, 0, 0));
+        database.push_back(new Customer(1964107, "Airtel", 0, 0, 0, 0, 0, 0, 0, 1, 0, 0));
+        database.push_back(new Customer(1280634, "JIO", 0, 0, 0, 0, 0, 0, 1, 0, 0, 0));
+        database.push_back(new Customer(1952023, "Partner", 0, 0, 0, 0, 347, 0, 0, 0, 0, 0));
+
+        // Display all data
+        cout << "# Combined Data Base:\n";
+        for_each(database.begin(), database.end(), [](Displayable* entry) {
+            entry->display();
+        });
+
+        // Clean up dynamically allocated memory
+        for (auto* entry : database) {
+            delete entry;
+        }
+
+    } catch (const InvalidDataException& e) {
+        cerr << e.what() << "\n";
+    } catch (const exception& e) {
+        cerr << "Unexpected Error: " << e.what() << "\n";
+    }
+
+    return 0;
+}
+
+
+
+
+#include <iostream>
+#include <vector>
+#include <string>
 
 using namespace std;
 
