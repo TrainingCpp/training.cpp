@@ -1,3 +1,152 @@
+//telecom fruad detection system 
+
+#include <iostream>
+#include <map>
+#include <set>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <fstream>
+#include <string>
+#include <random>
+#include <chrono>
+
+using namespace std;
+
+// Base class for fraud detection algorithms
+class FraudDetection {
+public:
+    virtual void detectFraud(const vector<string>& callLogs) = 0;
+    virtual ~FraudDetection() = default;
+};
+
+// Derived class for Sim Card Cloning Detection
+class SimCloningDetection : public FraudDetection {
+public:
+    void detectFraud(const vector<string>& callLogs) override {
+        set<string> uniqueNumbers;
+        cout << "Detecting SIM cloning...\n";
+
+        for (const auto& log : callLogs) {
+            string number = log.substr(0, log.find(',')); // Extract source number
+            if (uniqueNumbers.count(number)) {
+                ofstream logFile("fraud_detection.log", ios::app);
+                logFile << "Fraud detected: SIM cloning suspected for number " << number << "\n";
+                logFile.close();
+            }
+            uniqueNumbers.insert(number);
+        }
+    }
+};
+
+// Derived class for Unusual Activity Detection
+class UnusualActivityDetection : public FraudDetection {
+public:
+    void detectFraud(const vector<string>& callLogs) override {
+        map<string, int> callDuration;
+
+        cout << "Detecting unusual activities...\n";
+
+        for (const auto& log : callLogs) {
+            size_t pos1 = log.find(',');
+            size_t pos2 = log.find(',', pos1 + 1);
+            string number = log.substr(0, pos1);
+            int duration = stoi(log.substr(pos2 + 1)); // Extract duration
+
+            callDuration[number] += duration;
+
+            if (callDuration[number] > 3000) { // Unusual duration threshold
+                ofstream logFile("fraud_detection.log", ios::app);
+                logFile << "Fraud detected: Unusual activity for number " << number << " with total duration " << callDuration[number] << "\n";
+                logFile.close();
+            }
+        }
+    }
+};
+
+// Telecom Fraud Detection System
+class TelecomFraudDetectionSystem {
+private:
+    vector<string> callLogs;
+    set<string> blacklistedNumbers;
+    vector<unique_ptr<FraudDetection>> detectionAlgorithms;
+    mutex mtx;
+
+public:
+    void addCallLog(const string& log) {
+        lock_guard<mutex> lock(mtx);
+        callLogs.push_back(log);
+    }
+
+    void addBlacklistedNumber(const string& number) {
+        lock_guard<mutex> lock(mtx);
+        blacklistedNumbers.insert(number);
+    }
+
+    void detectFraud() {
+        lock_guard<mutex> lock(mtx);
+        for (const auto& algorithm : detectionAlgorithms) {
+            algorithm->detectFraud(callLogs);
+        }
+    }
+
+    void addDetectionAlgorithm(unique_ptr<FraudDetection> algorithm) {
+        detectionAlgorithms.push_back(move(algorithm));
+    }
+
+    void logBlacklistedFraud() {
+        lock_guard<mutex> lock(mtx);
+        ofstream logFile("fraud_detection.log", ios::app);
+
+        for (const auto& log : callLogs) {
+            string number = log.substr(0, log.find(',')); // Extract source number
+            if (blacklistedNumbers.count(number)) {
+                logFile << "Fraud detected: Call from blacklisted number " << number << "\n";
+            }
+        }
+
+        logFile.close();
+    }
+};
+
+// Simulate call log generation
+void generateCallLogs(TelecomFraudDetectionSystem& system) {
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution<> numberDist(1000000000, 9999999999); // Random 10-digit numbers
+    uniform_int_distribution<> durationDist(1, 500);              // Random durations
+
+    for (int i = 0; i < 100; ++i) {
+        string log = to_string(numberDist(gen)) + ",9876543210," + to_string(durationDist(gen));
+        system.addCallLog(log);
+    }
+}
+
+int main() {
+    TelecomFraudDetectionSystem system;
+
+    // Add detection algorithms
+    system.addDetectionAlgorithm(make_unique<SimCloningDetection>());
+    system.addDetectionAlgorithm(make_unique<UnusualActivityDetection>());
+
+    // Add blacklisted numbers
+    system.addBlacklistedNumber("1234567890");
+    system.addBlacklistedNumber("9876543210");
+
+    // Generate call logs
+    thread logGenerator(generateCallLogs, ref(system));
+    logGenerator.join();
+
+    // Detect fraud
+    system.detectFraud();
+    system.logBlacklistedFraud();
+
+    cout << "Fraud detection completed. Check fraud_detection.log for details.\n";
+
+    return 0;
+}
+
+
 //network traffic analysis 
 
 #include <iostream>
